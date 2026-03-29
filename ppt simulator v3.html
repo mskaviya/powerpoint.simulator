@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P3-P4 PowerPoint Simulator</title>
+    <style>
+        /* Base Styles */
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f3f2f1;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Ribbon Interface */
+        .ribbon-container {
+            background-color: #2b2b2b;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            z-index: 10;
+        }
+
+        .tabs {
+            display: flex;
+            padding: 5px 10px 0;
+            gap: 5px;
+            font-size: 14px;
+            align-items: flex-end;
+        }
+
+        .tab {
+            padding: 8px 16px;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            border-radius: 4px 4px 0 0;
+        }
+
+        .tab:hover { background-color: #444; }
+        .tab.active { border-bottom: 3px solid #c43e1c; background-color: #111; font-weight: 600; }
+        
+        .tab-file {
+            padding: 8px 16px;
+            cursor: pointer;
+            border-radius: 4px 4px 0 0;
+        }
+        .tab-file:hover { background-color: #444; }
+
+        .action-btn {
+            background: transparent;
+            color: white;
+            border: 1px solid #444;
+            padding: 6px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            margin-bottom: 3px;
+        }
+        .action-btn:hover { background-color: #555; border-color: #666;}
+
+        .ribbon-panel {
+            display: none;
+            background-color: #111;
+            padding: 10px 20px;
+            min-height: 70px;
+            align-items: center;
+            gap: 20px;
+            border-top: 1px solid #333;
+        }
+
+        .ribbon-panel.active { display: flex; }
+
+        .ribbon-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding-right: 20px;
+            border-right: 1px solid #444;
+        }
+
+        .ribbon-btn {
+            background: transparent;
+            color: white;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            padding: 8px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+            gap: 5px;
+        }
+
+        .ribbon-btn:hover { background-color: #333; border: 1px solid #555; }
+        .ribbon-btn i { font-size: 20px; } 
+
+        /* Canvas / Slide Area */
+        .workspace {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #e6e6e6;
+            overflow: hidden;
+            position: relative; /* Added for absolute positioning of the tip */
+        }
+
+        #slide {
+            width: 800px;
+            height: 450px;
+            background-color: white;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            position: relative;
+            transition: all 0.5s ease;
+            overflow: hidden;
+        }
+
+        /* Slide Elements */
+        .draggable { position: absolute; cursor: move; padding: 5px; user-select: none; }
+        .editable-text { min-width: 120px; min-height: 30px; border: 1px dotted transparent; font-size: 24px; font-family: 'Calibri', sans-serif; color: #000000; }
+        .editable-text:focus { border: 1px solid #666; outline: none; }
+        
+        .wordart {
+            font-size: 45px; font-weight: bold; color: #ff8c00;
+            text-shadow: 2px 2px 0px #000, 4px 4px 0px #ccc;
+        }
+
+        .shape { width: 100px; height: 100px; background-color: #0078d4; }
+        .shape.circle { border-radius: 50%; background-color: #107c41; }
+
+        table { border-collapse: collapse; background-color: white; font-family: Calibri; color: #000000; }
+        td { border: 1px solid #888; width: 100px; height: 30px; text-align: center; }
+
+        /* Animations */
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+        @keyframes fadein { 0% { opacity: 0; } 100% { opacity: 1; } }
+        .anim-spin { animation: spin 1s linear; }
+        .trans-fade { animation: fadein 1s ease; }
+
+        /* --- New Touch Tips & Notifications --- */
+        .mini-tip {
+            position: absolute;
+            right: 30px;
+            top: 30px;
+            background: #fff4ce; /* Office yellow hint */
+            border: 1px solid #f2c811;
+            color: #513c06;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            max-width: 220px;
+            z-index: 5;
+            line-height: 1.4;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background-color: #323130; /* Dark grey */
+            color: white;
+            padding: 12px 24px;
+            border-radius: 20px;
+            font-size: 14px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+            z-index: 1000;
+            pointer-events: none;
+        }
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        /* Modal Styles */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+        .modal-window { background-color: white; width: 600px; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); display: flex; flex-direction: column; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        .modal-header { background-color: #f3f2f1; padding: 10px 15px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; font-weight: bold; }
+        .close-btn { cursor: pointer; color: #d13438; font-size: 18px; font-weight: bold; }
+        .modal-body { display: flex; height: 300px; }
+        .sidebar { width: 150px; background-color: #f9f9f9; border-right: 1px solid #ddd; padding: 10px; }
+        .sidebar ul { list-style: none; padding: 0; margin: 0; }
+        .sidebar li { padding: 8px; cursor: pointer; border-radius: 4px; font-size: 14px; }
+        .sidebar li.active { background-color: #cce8ff; }
+        .folder-view { flex-grow: 1; padding: 15px; }
+        .breadcrumb { font-size: 12px; color: #666; margin-bottom: 15px; }
+        .folder-list { display: flex; gap: 15px; flex-wrap: wrap; }
+        .folder-item { display: flex; flex-direction: column; align-items: center; padding: 10px; border: 1px solid transparent; cursor: pointer; border-radius: 4px; }
+        .folder-item:hover { background-color: #f0f0f0; border: 1px solid #ccc; }
+        .folder-icon { font-size: 30px; margin-bottom: 5px; }
+        .modal-footer { background-color: #f3f2f1; padding: 15px; border-top: 1px solid #ddd; display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
+        .modal-footer input { padding: 5px; border: 1px solid #ccc; width: 200px; }
+        .modal-footer button { padding: 6px 20px; border: none; background-color: #0078d4; color: white; border-radius: 4px; cursor: pointer; }
+        .modal-footer button:hover { background-color: #005a9e; }
+    </style>
+</head>
+<body>
+
+    <div class="ribbon-container">
+        <div class="tabs">
+            <div class="tab-file" onclick="openSaveModal('Save As...')" title="Save your presentation">File</div>
+            <div class="tab active" onclick="switchTab('Home')" title="Basic tools and formatting">Home</div>
+            <div class="tab" onclick="switchTab('Insert')" title="Add objects to your slide">Insert</div>
+            <div class="tab" onclick="switchTab('Transitions')" title="Slide movement effects">Transitions</div>
+            <div class="tab" onclick="switchTab('Animations')" title="Animate specific shapes or text">Animations</div>
+            
+            <div style="flex-grow: 1;"></div>
+            
+            <button class="action-btn" onclick="undo()" title="Undo your last action">↩️ Undo</button>
+            <button class="action-btn" onclick="redo()" title="Redo the action you just undid">↪️ Redo</button>
+        </div>
+
+        <div id="panel-Home" class="ribbon-panel active">
+            <div class="ribbon-group">
+                <button class="ribbon-btn" onclick="addTextBox()" title="Insert a box to type text into">📝 <span>Textbox</span></button>
+                <button class="ribbon-btn" onclick="addShape('square')" title="Insert a blue square">🟦 <span>Square</span></button>
+                <button class="ribbon-btn" onclick="addShape('circle')" title="Insert a green circle">🟢 <span>Circle</span></button>
+            </div>
+            
+            <div class="ribbon-group">
+                <label class="ribbon-btn" for="elementColor" title="Change the color of the selected item">
+                    <input type="color" id="elementColor" value="#000000" onchange="changeElementColor(this.value)" style="width: 25px; height: 25px; border: none; padding: 0; background: transparent; cursor: pointer;">
+                    <span>Color</span>
+                </label>
+            </div>
+            
+            <span style="font-size: 12px; color: #888;">Drawing & Formatting</span>
+        </div>
+
+        <div id="panel-Insert" class="ribbon-panel">
+            <div class="ribbon-group">
+                <button class="ribbon-btn" onclick="addTable()" title="Insert a table to organize data">📊 <span>Table</span></button>
+            </div>
+            <div class="ribbon-group">
+                <button class="ribbon-btn" onclick="addWordArt()" title="Insert fancy styled text">✨ <span>WordArt</span></button>
+            </div>
+            <span style="font-size: 12px; color: #888;">Text & Tables</span>
+        </div>
+
+        <div id="panel-Transitions" class="ribbon-panel">
+            <div class="ribbon-group">
+                <button class="ribbon-btn" onclick="playTransition()" title="Play a fade effect on the whole slide">🎬 <span>Fade Transition</span></button>
+            </div>
+            <span style="font-size: 12px; color: #888;">Transition to This Slide</span>
+        </div>
+
+        <div id="panel-Animations" class="ribbon-panel">
+            <div class="ribbon-group">
+                <button class="ribbon-btn" onclick="animateElement()" title="Make the selected object spin">🔄 <span>Spin</span></button>
+            </div>
+            <span style="font-size: 12px; color: #888;">Click an item first!</span>
+        </div>
+    </div>
+
+    <div class="workspace">
+        
+        <div class="mini-tip">
+            💡 <b>Simulator Tip:</b><br><br>
+            Click the buttons above to add items. You can <b>drag</b> items around the slide, and <b>click text</b> to type!
+        </div>
+
+        <div id="slide">
+            <div class="draggable" style="top: 50px; left: 250px;">
+                <div class="editable-text" style="font-size: 32px; font-weight: bold;" contenteditable="true">Enter text here</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast">Action completed.</div>
+
+    <div id="saveModal" class="modal-overlay">
+        <div class="modal-window">
+            <div class="modal-header">
+                <span id="modal-title">Save As</span>
+                <span class="close-btn" onclick="closeSaveModal()">✖</span>
+            </div>
+            <div class="modal-body">
+                <div class="sidebar">
+                    <ul>
+                        <li class="active">📁 Documents</li>
+                        <li>🖥️ Desktop</li>
+                        <li>🖼️ Pictures</li>
+                    </ul>
+                </div>
+                <div class="folder-view">
+                    <div class="breadcrumb">This PC > Documents > <span id="current-path" style="font-weight: bold; color: #0078d4;"></span></div>
+                    
+                    <div class="folder-list" id="folder-list">
+                        <div class="folder-item" onclick="enterFolder('P3 Computer Class')">
+                            <div class="folder-icon">📁</div>
+                            <span>P3 Computer Class</span>
+                        </div>
+                        <div class="folder-item" onclick="enterFolder('My Science Project')">
+                            <div class="folder-icon">📁</div>
+                            <span>My Science Project</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <label>File name:</label>
+                <input type="text" id="filename-input" value="Presentation1">
+                <button onclick="executeSave()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const slide = document.getElementById('slide');
+        let selectedElement = null;
+        
+        // --- Toast Notification Logic ---
+        const toastEl = document.getElementById('toast');
+        let toastTimer;
+
+        function showToast(message) {
+            toastEl.innerText = message;
+            toastEl.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => {
+                toastEl.classList.remove('show');
+            }, 2500); // Hides after 2.5 seconds
+        }
+
+        // --- History / Undo / Redo Variables ---
+        let undoStack = [];
+        let redoStack = [];
+
+        function saveState() {
+            let tempBorder = "";
+            if (selectedElement) {
+                tempBorder = selectedElement.style.border;
+                selectedElement.style.border = "none";
+            }
+            
+            let currentState = slide.innerHTML;
+            
+            if (undoStack.length === 0 || undoStack[undoStack.length - 1] !== currentState) {
+                undoStack.push(currentState);
+                redoStack = []; 
+            }
+
+            if (selectedElement) {
+                selectedElement.style.border = tempBorder;
+            }
+        }
+
+        function undo() {
+            if (undoStack.length > 0) {
+                let tempBorder = "";
+                if (selectedElement) {
+                    tempBorder = selectedElement.style.border;
+                    selectedElement.style.border = "none";
+                }
+                redoStack.push(slide.innerHTML);
+                slide.innerHTML = undoStack.pop();
+                rebindEvents();
+                showToast("Action undid ↩️");
+            } else {
+                showToast("Nothing to undo!");
+            }
+        }
+
+        function redo() {
+            if (redoStack.length > 0) {
+                let tempBorder = "";
+                if (selectedElement) {
+                    tempBorder = selectedElement.style.border;
+                    selectedElement.style.border = "none";
+                }
+                undoStack.push(slide.innerHTML);
+                slide.innerHTML = redoStack.pop();
+                rebindEvents();
+                showToast("Action redid ↪️");
+            } else {
+                showToast("Nothing to redo!");
+            }
+        }
+
+        function rebindEvents() {
+            selectedElement = null; 
+            document.querySelectorAll('.draggable').forEach(item => {
+                item.onmousedown = startDrag;
+                item.onclick = selectElement;
+                
+                const editables = item.querySelectorAll('[contenteditable="true"]');
+                editables.forEach(ed => {
+                    ed.onfocus = saveState;
+                });
+            });
+        }
+
+        // --- Ribbon Tab Switching ---
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+
+            document.querySelectorAll('.ribbon-panel').forEach(p => p.classList.remove('active'));
+            document.getElementById('panel-' + tabName).classList.add('active');
+        }
+
+        // --- Slide Elements Functions ---
+        function addTextBox() {
+            createDraggable(`<div class="editable-text" contenteditable="true">Click to type!</div>`);
+            showToast("Text box added to slide");
+        }
+        function addWordArt() {
+            createDraggable(`<div class="editable-text wordart" contenteditable="true">Awesome!</div>`);
+            showToast("WordArt added to slide");
+        }
+        function addShape(type) {
+            createDraggable(`<div class="shape ${type}"></div>`);
+            showToast("Shape added to slide");
+        }
+        function addTable() {
+            createDraggable(`
+                <table contenteditable="true">
+                    <tr><td>Item</td><td>Count</td></tr>
+                    <tr><td>Apples</td><td>5</td></tr>
+                </table>
+            `);
+            showToast("Table added to slide");
+        }
+
+        function createDraggable(htmlContent) {
+            saveState();
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'draggable';
+            wrapper.innerHTML = htmlContent;
+            
+            wrapper.style.left = '350px';
+            wrapper.style.top = '150px';
+
+            wrapper.onmousedown = startDrag;
+            wrapper.onclick = selectElement;
+            
+            const editables = wrapper.querySelectorAll('[contenteditable="true"]');
+            editables.forEach(ed => {
+                ed.onfocus = saveState;
+            });
+
+            slide.appendChild(wrapper);
+            selectElement({ currentTarget: wrapper });
+        }
+
+        // --- Color Picker Logic ---
+        function changeElementColor(color) {
+            if (!selectedElement) {
+                showToast("⚠️ Click an item first to change its color!");
+                return;
+            }
+            
+            saveState(); 
+            
+            const editableText = selectedElement.querySelector('.editable-text');
+            const shape = selectedElement.querySelector('.shape');
+            const table = selectedElement.querySelector('table');
+
+            if (editableText) {
+                editableText.style.color = color; 
+            } else if (shape) {
+                shape.style.backgroundColor = color;
+            } else if (table) {
+                table.style.color = color;
+            }
+            showToast("Color applied! 🎨");
+        }
+
+        function selectElement(e) {
+            if(selectedElement) selectedElement.style.border = "none";
+            selectedElement = e.currentTarget;
+            selectedElement.style.border = "2px dashed #0078d4";
+        }
+
+        function startDrag(e) {
+            if(e.target.hasAttribute('contenteditable') && document.activeElement === e.target) return; 
+
+            saveState();
+
+            const el = e.currentTarget;
+            let startX = e.clientX;
+            let startY = e.clientY;
+
+            function onMouseMove(e) {
+                el.style.left = (el.offsetLeft + (e.clientX - startX)) + 'px';
+                el.style.top = (el.offsetTop + (e.clientY - startY)) + 'px';
+                startX = e.clientX;
+                startY = e.clientY;
+            }
+
+            function onMouseUp() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        // --- Animation & Transition ---
+        function animateElement() {
+            if (!selectedElement) {
+                showToast("⚠️ Select a shape or text box to animate!");
+                return;
+            }
+            selectedElement.classList.add('anim-spin');
+            setTimeout(() => selectedElement.classList.remove('anim-spin'), 1000);
+            showToast("Playing Spin Animation...");
+        }
+
+        function playTransition() {
+            slide.classList.remove('trans-fade');
+            void slide.offsetWidth; 
+            slide.classList.add('trans-fade');
+            showToast("Playing Fade Transition...");
+        }
+
+        // --- Simulated Folder Logic ---
+        const modal = document.getElementById('saveModal');
+        const pathSpan = document.getElementById('current-path');
+        const folderList = document.getElementById('folder-list');
+        let currentFolder = "";
+
+        function openSaveModal(title) {
+            document.getElementById('modal-title').innerText = title;
+            modal.style.display = 'flex';
+            resetFolderView();
+        }
+
+        function closeSaveModal() {
+            modal.style.display = 'none';
+        }
+
+        function resetFolderView() {
+            currentFolder = "";
+            pathSpan.innerText = "";
+            folderList.innerHTML = `
+                <div class="folder-item" onclick="enterFolder('P3 Computer Class')">
+                    <div class="folder-icon">📁</div><span>P3 Computer Class</span>
+                </div>
+                <div class="folder-item" onclick="enterFolder('My Science Project')">
+                    <div class="folder-icon">📁</div><span>My Science Project</span>
+                </div>
+            `;
+        }
+
+        function enterFolder(folderName) {
+            currentFolder = folderName;
+            pathSpan.innerText = folderName;
+            folderList.innerHTML = `<p style="color:#888; width:100%; text-align:center; margin-top:40px;">This folder is empty.</p>`;
+        }
+
+        function executeSave() {
+            const fileName = document.getElementById('filename-input').value;
+            if (!currentFolder) {
+                alert("Please click on a folder to open it first!");
+                return;
+            }
+            if (!fileName) {
+                alert("Please type a file name!");
+                return;
+            }
+            
+            if(selectedElement) selectedElement.style.border = "none";
+            alert(`🎉 Success!\n\nYou saved "${fileName}.pptx"\nInside the folder: "${currentFolder}"`);
+            closeSaveModal();
+        }
+
+        // --- Initialize on Page Load ---
+        window.onload = () => {
+            rebindEvents();
+        };
+    </script>
+</body>
+</html>
